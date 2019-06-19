@@ -53,6 +53,7 @@ import net.minidev.json.JSONValue;
 import net.minidev.json.reader.JsonWriter;
 import net.minidev.json.reader.JsonWriterI;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /**
  *
@@ -152,7 +153,7 @@ public class JsonUtils {
             });
 
         } else if (o instanceof List) {
-            if (depth > 10  || !seen.add(o)) {
+            if (depth > 10 || !seen.add(o)) {
                 return true;
             }
             List list = (List) o;
@@ -162,7 +163,7 @@ public class JsonUtils {
                 if (recurseCyclic(depth + 1, v, seen)) {
                     list.set(i, "#" + v.getClass().getName());
                 }
-            }            
+            }
         }
         return false;
     }
@@ -206,6 +207,25 @@ public class JsonUtils {
 
     public static String escapeValue(String raw) {
         return JSONValue.escape(raw, JSONStyle.LT_COMPRESS);
+    }
+
+    public static void removeKeysWithNullValues(Object o) {
+        if (o instanceof Map) {
+            Map<String, Object> map = (Map) o;
+            for (Map.Entry<String, Object> entry : map.entrySet()) {
+                Object v = entry.getValue();
+                if (v == null) {
+                    map.remove(entry.getKey());
+                } else {
+                    removeKeysWithNullValues(v);
+                }
+            }
+        } else if (o instanceof List) {
+            List list = (List) o;
+            for (Object v : list) {
+                removeKeysWithNullValues(v);
+            }
+        }
     }
 
     private static void recursePretty(Object o, StringBuilder sb, int depth, Set<Object> seen) {
@@ -382,8 +402,9 @@ public class JsonUtils {
     }
 
     public static DocumentContext fromYaml(String raw) {
-        Yaml yaml = new Yaml();
-        return JsonPath.parse(yaml.load(raw));
+        Yaml yaml = new Yaml(new SafeConstructor());
+        Object o = yaml.load(raw);
+        return JsonPath.parse(o);
     }
 
     public static DocumentContext fromCsv(String raw) {

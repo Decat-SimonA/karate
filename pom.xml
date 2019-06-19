@@ -4,7 +4,7 @@
 
     <groupId>com.intuit.karate</groupId>
     <artifactId>karate-parent</artifactId>
-    <version>0.9.2</version>
+    <version>0.9.3</version>
     <packaging>pom</packaging>
     
     <name>${project.artifactId}</name>
@@ -50,6 +50,7 @@
         <module>karate-apache</module>              
         <module>karate-junit4</module>
         <module>karate-junit5</module>
+        <module>karate-ui</module>
         <module>karate-netty</module>
         <module>karate-gatling</module>             
         <module>karate-demo</module>
@@ -64,12 +65,7 @@
             <artifactId>logback-classic</artifactId>
             <version>1.2.3</version>
             <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-controls</artifactId>
-            <version>12-ea+9</version>
-        </dependency>          		
+        </dependency>         		
     </dependencies>
 
     <build>       

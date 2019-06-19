@@ -29,17 +29,24 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpClientCodec;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import java.net.URI;
+import java.util.Map;
+import javax.net.ssl.SSLException;
 
 /**
  *
  * @author pthomas3
  */
+
+
 public class WebSocketClientInitializer extends ChannelInitializer<SocketChannel> {
 
     private final URI uri;
@@ -47,12 +54,26 @@ public class WebSocketClientInitializer extends ChannelInitializer<SocketChannel
     private final SslContext sslContext;
     private final WebSocketClientHandler handler;
 
-    public WebSocketClientInitializer(URI uri, int port, String subProtocol, SslContext sslContext, WebSocketListener listener) {
-        this.uri = uri;
-        this.port = port;
-        this.sslContext = sslContext;
-        WebSocketClientHandshaker handShaker = WebSocketClientHandshakerFactory.newHandshaker(uri, WebSocketVersion.V13, subProtocol, true, new DefaultHttpHeaders(), 4194304);
-        handler = new WebSocketClientHandler(handShaker, listener);        
+    public WebSocketClientInitializer(WebSocketOptions options, WebSocketListener listener) {
+        this.uri = options.getUri();
+        this.port = options.getPort();
+        if (options.isSsl()) {
+            try {
+                sslContext = SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
+            } catch (SSLException e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            sslContext = null;
+        }
+        HttpHeaders nettyHeaders = new DefaultHttpHeaders();
+        Map<String, Object> headers = options.getHeaders();
+        if (headers != null) {
+            headers.forEach((k, v) -> nettyHeaders.add(k, v));
+        }
+        WebSocketClientHandshaker handShaker = WebSocketClientHandshakerFactory.newHandshaker(
+                uri, WebSocketVersion.V13, options.getSubProtocol(), true, nettyHeaders, options.getMaxPayloadSize());
+        handler = new WebSocketClientHandler(handShaker, listener);
     }
 
     @Override
@@ -69,6 +90,6 @@ public class WebSocketClientInitializer extends ChannelInitializer<SocketChannel
 
     public WebSocketClientHandler getHandler() {
         return handler;
-    }        
+    }
 
 }

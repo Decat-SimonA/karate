@@ -13,14 +13,17 @@ Scenario: arrays returned from js can be modified using 'set'
     * set json[1].a = 5
     * match json == [{a: 1}, {a: 5}, {b: 3}]
 
-Scenario: json behaves like a java map within functions
+Scenario: json behaves like a java map within functions (will change with graal)
     * def payload = { a: 1, b: 2 }
-    * def keys = function(obj){ return payload.keySet() }
-    * def values = function(obj){ return payload.values() }
+    * def keys = function(o){ return o.keySet() }
+    * def values = function(o){ return o.values() }
+    * def size = function(o){ return o.size() }
     * json result = keys(payload)
     * match result == ['a', 'b']
     * json result = values(payload)
     * match result == [1, 2]
+    * def length = size(payload)
+    * match length == 2
 
 Scenario: json-path can be performed in js
     * def json = [{foo: 1}, {foo: 2}]
@@ -38,12 +41,8 @@ Scenario: set via json-path can be done in js
     * eval karate.set('json', '$.foo[]', { bar: 'baz' })
     * match json == { foo: [{ bar: 'baz' }] }
 
-Scenario: this seems to be a bug in Nashorn, refer: https://github.com/intuit/karate/issues/225
-    adding this test to detect if ever the JDK behavior changes
-    * def actual = ({ a: [1, 2, 3]})
-    * match actual == { a: { '0': 1, '1': 2, '2': 3 }}
-    * def temp = [1, 2, 3]
-    * def actual = ({ a: temp })
+Scenario: ensure nested nashorn arrays convert correctly
+    * def actual = ({ a: [1, 2, 3] })
     * match actual == { a: [1, 2, 3] }
 
 Scenario: karate forEach operation on lists
@@ -103,6 +102,35 @@ Scenario: karate find index of first match (complex)
     * def fun = function(x, i){ if (karate.match(x, searchFor).pass) foundAt.add(i) }
     * eval karate.forEach(list, fun)
     * match foundAt == [1]
+
+Scenario: map with key - for the common case of converting arrays of primitives into arrays of objects
+    * def list = [ 'Bob', 'Wild', 'Nyan' ]
+    * def data = karate.mapWithKey(list, 'name')
+    * match data == [{ name: 'Bob' }, { name: 'Wild' }, { name: 'Nyan' }]
+
+    * def list = [ 1, 2, 3]
+    * def data = karate.mapWithKey(list, 'val')
+    * match data == [{ val: 1 }, { val: 2 }, { val: 3 }]
+
+    # will actually work for any kind of list
+    * def list = [{ a: 1 }, { b: 2 }]
+    * def data = karate.mapWithKey(list, 'foo')
+    * match data == [{ foo: { a: 1 } }, { foo: { b: 2 } }]
+
+    # should work for null edge case
+    * def list = null
+    * def data = karate.mapWithKey(list, 'foo')
+    * match data == []
+
+Scenario: merge
+    * def foo = { a: 1 }
+    * def bar = karate.merge(foo, { b: 2 })
+    * match bar == { a: 1, b: 2 }
+
+Scenario: append
+    * def foo = [{ a: 1 }]
+    * def bar = karate.append(foo, { b: 2 })
+    * match bar == [{ a: 1 }, { b: 2 }]
 
 Scenario: simplest way to get the size of a json object
     * def json = { a: 1, b: 2, c: 3 }
@@ -209,7 +237,7 @@ Scenario: remove json value
 
 Scenario: optional json values
     * def response = [{a: 'one', b: 'two'}, { a: 'one' }]
-    * match each response contains { a: 'one', b: '##("two")' }
+    * match each response contains { a: 'one', b: '##string' }
 
 Scenario: #null, ##null, #present and #notpresent
     * def foo = { }
@@ -247,6 +275,11 @@ Scenario: alternative notpresent check using json-path
     * def foo = { a: 1 }
     * match foo.a == '#present'
     * match foo.nope == '#notpresent'
+
+Scenario: regression test for edge case in fuzzy matches
+    * def answer = { foo: 'foo', bar: 'bar', baz': 'baz' }
+    * match answer != { foo: '#string', foobar: '#notpresent', foobaz': '#notpresent' }
+    * match answer != { foo: '#string', foobar: '##string', foobaz': '##string' }
 
 Scenario: get and json path
     * def foo = { bar: { baz: 'ban' } }
@@ -396,7 +429,7 @@ Scenario: set via table, repeated paths at the top
 
     * match foo == { bar: { one: 1, two: [2, 3] } }
 
-Scenario Outline: examples and optional json keys
+Scenario Outline: examples and optional json keys (see outline.feature for a better version)
     * def search = { name: { first: "##(<first>)", last: "##(<last>)" }, age: "##(<age>)" }
     * match search == <expected>
 
@@ -467,3 +500,36 @@ Scenario: match in js
     * def result = karate.match(foo, { hello: '#string'} )
     * match result == { pass: true, message: null }
     * eval if (result.pass) karate.log('*** passed')
+
+Scenario: using the java contains api (will change with graal)
+    * def allowed = ['Music', 'Entertainment', 'Documentaries', 'Family']
+    * def actual = ['Entertainment', 'Family']
+    * match each actual == '#? allowed.contains(_)'
+
+Scenario: using the java indexOf api (will change with graal)
+    * def response = [{ name: 'a' }, { name: 'b' }, { name: 'c' }]
+    * def names = $[*].name
+    * def index = names.indexOf('b')
+    * match index == 1
+
+Scenario: karate.forEach() and js arguments (may change with graal)
+    * def vals = []
+    * def fun = function(){ karate.forEach(arguments, function(k, v){ vals.add(v) }) }
+    * eval fun('a', 'b', 'c')
+    * match vals == ['a', 'b', 'c']
+
+Scenario: lists - karate.sizeOf() keysOf() valuesOf() appendTo()
+    * def foo = [1, 2, 3]
+    * match karate.sizeOf(foo) == 3
+    * match karate.valuesOf(foo) == [1, 2, 3]
+    * def bar = karate.appendTo('foo', 4)
+    * match foo == [1, 2, 3, 4]
+    * match bar == [1, 2, 3, 4]
+    * def bar = karate.appendTo('foo', [5, 6])
+    * match foo == [1, 2, 3, 4, 5, 6]
+    * match bar == [1, 2, 3, 4, 5, 6]
+
+Scenario: maps - karate.sizeOf() keysOf() valuesOf() appendTo()
+    * def foo = { a: 1, b: 2, c: 3 }
+    * match karate.sizeOf(foo) == 3
+    * match karate.keysOf(foo) == ['a', 'b', 'c']

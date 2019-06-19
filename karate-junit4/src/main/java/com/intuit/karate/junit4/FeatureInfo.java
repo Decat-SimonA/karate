@@ -81,7 +81,8 @@ public class FeatureInfo implements ExecutionHook {
 
     @Override
     public boolean beforeScenario(Scenario scenario, ScenarioContext context) {
-        if (notifier == null) {
+        // if dynamic scenario outline background or a call
+        if (notifier == null || context.callDepth > 0) {
             return true;
         }
         notifier.fireTestStarted(getScenarioDescription(scenario));
@@ -90,16 +91,18 @@ public class FeatureInfo implements ExecutionHook {
 
     @Override
     public void afterScenario(ScenarioResult result, ScenarioContext context) {
-        if (notifier == null) { // dynamic scenario outline background
+        // if dynamic scenario outline background or a call
+        if (notifier == null || context.callDepth > 0) { 
             return;
         }
         Description scenarioDescription = getScenarioDescription(result.getScenario());
         if (result.isFailed()) {
             notifier.fireTestFailure(new Failure(scenarioDescription, result.getError()));
-        } else {
-            notifier.fireTestFinished(scenarioDescription);
         }
-    }
+        // apparently this method should be always called
+        // even if fireTestFailure was called
+        notifier.fireTestFinished(scenarioDescription);
+     }
 
     @Override
     public String getPerfEventName(HttpRequestBuilder req, ScenarioContext context) {

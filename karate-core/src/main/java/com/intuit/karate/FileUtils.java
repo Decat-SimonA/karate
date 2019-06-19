@@ -106,6 +106,7 @@ public class FileUtils {
         text = pair.left;
         if (isJsonFile(text) || isXmlFile(text) || isJavaScriptFile(text)) {
             String contents = readFileAsString(text, context);
+            contents = StringUtils.fixJavaScriptFunction(contents);
             ScriptValue temp = Script.evalKarateExpression(contents, context);
             return new ScriptValue(temp.getValue(), text);
         } else if (isTextFile(text) || isGraphQlFile(text)) {
@@ -160,7 +161,7 @@ public class FileUtils {
     private static Resource toResource(String path, ScenarioContext context) {
         if (isClassPath(path)) {
             ClassLoader cl = context.getClass().getClassLoader();
-            return new Resource(fromRelativeClassPath(path, cl), path);
+            return new Resource(fromRelativeClassPath(path, cl), path, -1);
         } else if (isFilePath(path)) {
             String temp = removePrefix(path);
             return new Resource(new File(temp), path);
@@ -168,12 +169,12 @@ public class FileUtils {
             String temp = removePrefix(path);
             Path parentPath = context.featureContext.parentPath;
             Path childPath = parentPath.resolve(temp);
-            return new Resource(childPath, path);
+            return new Resource(childPath, path, -1);
         } else {
             try {
                 Path parentPath = context.rootFeatureContext.parentPath;
                 Path childPath = parentPath.resolve(path);
-                return new Resource(childPath, path);
+                return new Resource(childPath, path, -1);
             } catch (Exception e) {
                 logger.error("feature relative path resolution failed: {}", e.getMessage());
                 throw e;
@@ -386,18 +387,33 @@ public class FileUtils {
     }
 
     public static Path getPathContaining(Class clazz) {
+        String relative = packageAsPath(clazz);
+        URL url = clazz.getClassLoader().getResource(relative);
+        return getPathFor(url, null);
+    }
+
+    private static String packageAsPath(Class clazz) {
+
         Package p = clazz.getPackage();
         String relative = "";
         if (p != null) {
             relative = p.getName().replace('.', '/');
         }
-        URL url = clazz.getClassLoader().getResource(relative);
-        return getPathFor(url, null);
+        return relative;
     }
 
     public static File getFileRelativeTo(Class clazz, String path) {
         Path dirPath = getPathContaining(clazz);
-        return new File(dirPath + File.separator + path);
+        File file = new File(dirPath + File.separator + path);
+        if (file.exists()) {
+            return file;
+        }
+        try {
+            URL relativePath = clazz.getClassLoader().getResource(packageAsPath(clazz) + File.separator + path);
+            return Paths.get(relativePath.toURI()).toFile();
+        } catch (Exception e) {
+            throw new IllegalArgumentException(String.format("Cannot resolve path '%s' relative to class '%s' ", path, clazz.getName()), e);
+        }
     }
 
     public static String toRelativeClassPath(Class clazz) {
@@ -555,6 +571,16 @@ public class FileUtils {
 
     private static void collectFeatureFiles(URL url, String searchPath, List<Resource> files) {
         boolean classpath = url != null;
+        int colonPos = searchPath.lastIndexOf(':');
+        int line = -1;
+        if (colonPos > 1) { // line number has been appended, and not windows "C:\foo" kind of path
+            try {
+                line = Integer.valueOf(searchPath.substring(colonPos + 1));
+                searchPath = searchPath.substring(0, colonPos);
+            } catch (Exception e) {
+                // defensive coding, abort attempting to parse line number
+            }
+        }
         Path rootPath;
         Path search;
         if (classpath) {
@@ -580,11 +606,11 @@ public class FileUtils {
                 String relativePath = rootPath.relativize(path.toAbsolutePath()).toString();
                 relativePath = relativePath.replaceAll("[.]{2,}", "");
                 String prefix = classpath ? CLASSPATH_COLON : "";
-                files.add(new Resource(path, prefix + toStandardPath(relativePath)));
+                files.add(new Resource(path, prefix + toStandardPath(relativePath), line));
             }
         }
     }
-    
+
     public static String getBuildDir() {
         String temp = System.getProperty("karate.output.dir");
         if (temp != null) {
@@ -592,7 +618,7 @@ public class FileUtils {
         }
         String command = System.getProperty("sun.java.command", "");
         return command.contains("org.gradle.") ? "build" : "target";
-    }    
+    }
 
     public static enum Platform {
         WINDOWS,

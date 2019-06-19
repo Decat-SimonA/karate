@@ -56,11 +56,17 @@ public class Match {
     public Match() {
         this(null, null);
     }
+    
+    public static Match init(Object o) {
+        Match match = new Match(null, null);
+        match.prevValue = new ScriptValue(o);
+        return match;
+    }
 
     private Match(Logger logger, String exp) {
         FeatureContext featureContext = FeatureContext.forEnv();
         String httpClass = logger == null ? DummyHttpClient.class.getName() : null;
-        CallContext callContext = new CallContext(null, null, 0, null, -1, false, false,
+        CallContext callContext = new CallContext(null, null, 0, null, -1, null, false, false,
                 httpClass, null, false);
         context = new ScenarioContext(featureContext, callContext, null, logger);
         if (exp != null) {
@@ -281,6 +287,11 @@ public class Match {
         Match m = new Match();
         m.prevValue = new ScriptValue(o);
         return m.matchText(exp, matchType);
+    }
+
+    public Match config(String key, String value){
+        context.configure(key,value);
+        return this;
     }
 
 }

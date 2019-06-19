@@ -30,7 +30,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  *
@@ -48,7 +47,6 @@ public class HttpRequestBuilder {
     private ScriptValue body;
     private String method;
     private String soapAction;
-    private boolean retry;
     private String retryUntil;
 
     public HttpRequestBuilder copy() {
@@ -73,10 +71,11 @@ public class HttpRequestBuilder {
             out.multiPartItems = new ArrayList(multiPartItems);
         }
         if (body != null) {
-            out.body = body.copy();
+            out.body = body.copy(true);
         }
         out.method = method;
         out.soapAction = soapAction;
+        out.retryUntil = retryUntil;
         return out;
     }
 

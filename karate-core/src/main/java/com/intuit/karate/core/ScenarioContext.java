@@ -48,6 +48,7 @@ import com.intuit.karate.http.MultiPartItem;
 import com.intuit.karate.driver.Driver;
 import com.intuit.karate.driver.DriverOptions;
 import com.intuit.karate.netty.WebSocketClient;
+import com.intuit.karate.netty.WebSocketOptions;
 import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
 import java.util.ArrayList;
@@ -56,7 +57,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -78,6 +78,15 @@ public class ScenarioContext {
     public final Collection<ExecutionHook> executionHooks;
     public final boolean perfMode;
     public final ScenarioInfo scenarioInfo;
+
+    public final Function<String, Object> read = s -> {
+        ScriptValue sv = FileUtils.readFile(s, this);
+        if (sv.isXml()) {
+            return sv.getValue();
+        } else { // json should behave like json within js / function
+            return sv.getAfterConvertingFromJsonOrXmlIfNeeded();
+        }
+    };
 
     // these can get re-built or swapped, so cannot be final
     private Config config;
@@ -102,10 +111,12 @@ public class ScenarioContext {
     // ui support
     private Function<CallContext, FeatureResult> callable;
 
-    // websocket
+    // async
     private final Object LOCK = new Object();
-    private List<WebSocketClient> webSocketClients;
     private Object signalResult;
+
+    // websocket    
+    private List<WebSocketClient> webSocketClients;
 
     public void logLastPerfEvent(String failureMessage) {
         if (prevPerfEvent != null && executionHooks != null) {
@@ -796,8 +807,8 @@ public class ScenarioContext {
         prevEmbed = embed;
     }
 
-    public WebSocketClient webSocket(String url, String subProtocol, Consumer<String> textHandler, Consumer<byte[]> binaryHandler) {
-        WebSocketClient webSocketClient = new WebSocketClient(url, subProtocol, textHandler, binaryHandler);
+    public WebSocketClient webSocket(WebSocketOptions options) {
+        WebSocketClient webSocketClient = new WebSocketClient(options);
         if (webSocketClients == null) {
             webSocketClients = new ArrayList();
         }

@@ -135,6 +135,31 @@ Feature files (or search paths) to be tested don't need command-line flags or op
 ```
 java -jar karate.jar my-test.feature
 ```
+#### Custom Classpath
+Karate allows you to use custom Java code or 3rd party Java libraries using [Java interop](https://github.com/intuit/karate#calling-java). Normally those who do this use Karate in the context of [Maven](https://maven.apache.org) or [Gradle](https://gradle.org) - and the [classpath](https://github.com/intuit/karate#classpath) would be set automatically.
+
+You can use the standalone JAR and still depend on external Java code - but you have to set the classpath for this to work. The entry-point for the Karate command-line app is `com.intuit.karate.Main`. Here is an example of using the 3rd-party [SikuliX](http://sikulix.com) library, assuming it is in the current working directory.
+
+```
+java -cp karate.jar:sikulixapi.jar com.intuit.karate.Main test.feature
+```
+
+If on Windows, note that the path-separator is `;` instead of `:` as seen above for Mac / Linux. Refer this [post](https://stackoverflow.com/a/56458094/143475) for more details.
+
+This approach is useful if you are trying to point the standalone Karate JAR file to a project structure that comes from the Java / Maven world. And the [`karate-config.js`](https://github.com/intuit/karate#configuration) will be looked for in the classpath itself.
+
+#### Scenario Name
+If you only want to run a single `Scenario` by name, use the `-n` or `--name` option:
+
+```
+java -jar karate.jar -n "^some name$" my-test.feature
+```
+
+Note that you can run a single `Scenario` by line number - by appending it at the end of the feature name with a colon character. For `Scenario Outline`-s, you can even select a single `Examples` row by line-number.
+
+```
+java -jar karate.jar my-test.feature:42
+```
 
 #### Tags
 You can specify [Cucumber tags](https://github.com/intuit/karate#cucumber-tags) to include (or exclude) using the `-t` or `--tags`  option as follows:

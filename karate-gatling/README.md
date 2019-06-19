@@ -26,6 +26,12 @@ Since the above does *not* include the [`karate-apache` (or `karate-jersey`)]((h
 
 You will also need the [Gatling Maven Plugin](https://github.com/gatling/gatling-maven-plugin), refer to the below [sample project](https://github.com/ptrthomas/karate-gatling-demo) for how to use this for a typical Karate project where feature files are in `src/test/java`. For convenience we recommend you keep even the Gatling simulation files in the same folder hierarchy, even though they are technically files with a `*.scala` extension.
 
+### Gradle
+
+For those who use [Gradle](https://gradle.org), this sample [`build.gradle`](build.gradle) provides a `gatlingRun` task that executes the Gatling test of the `karate-netty` project - which you can use as a reference. The approach is fairly simple, and does not require the use of any Gradle Gatling plugins.
+
+Most problems when using Karate with Gradle occur when "test-resources" are not configured properly. So make sure that all your `*.js` and `*.feature` files are copied to the "resources" folder - when you build the project.
+
 ## Sample Project:
 Refer: https://github.com/ptrthomas/karate-gatling-demo
 
@@ -33,6 +39,8 @@ It is worth calling out that we are perf-testing [Karate test-doubles](https://h
 
 ## Limitations
 As of now the Gatling concept of ["throttle" and related syntax](https://gatling.io/docs/2.3/general/simulation_setup/#simulation-setup-throttling) is not supported. Most teams don't need this, but you can declare "pause" times in Karate, see [`pauseFor()`](#pausefor).
+
+Also the concept of Gatling "[groups](https://gatling.io/docs/2.3/general/scenario/#groups-definition)" is not supported where you can have sub-groups within groups. However custom grouping via the [`nameResolver`](#nameresolver) is sufficient for most teams.
 
 ## Usage
 

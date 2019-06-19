@@ -21,13 +21,13 @@ With the help of the community, we would like to try valiantly - to see if we ca
 * [Cross-Browser support](https://twitter.com/ptrthomas/status/1048260573513666560) including [Microsoft Edge on Windows](https://twitter.com/ptrthomas/status/1046459965668388866) and [Safari on Mac](https://twitter.com/ptrthomas/status/1047152170468954112)
 * WebDriver support without any intermediate server
 * Windows [Desktop application automation](https://twitter.com/KarateDSL/status/1052432964804640768) using the Microsoft [WinAppDriver](https://github.com/Microsoft/WinAppDriver)
-* The Windows example above proves that the approach would work for Appium with minimal changes (please contribute !)
+* Android and iOS mobile support via [Appium](http://appium.io), see [details](https://github.com/intuit/karate/issues/743)
 * Karate can start the executable (WebDriver / Chrome, WinAppDriver, Appium Server) automatically for you
 * Seamlessly mix API and UI tests within the same script
 * Use the power of Karate's [`match`](https://github.com/intuit/karate#prepare-mutate-assert) assertions and [core capabilities](https://github.com/intuit/karate#features) for UI element assertions
 
 ### Chrome Java API
-Karate also has a Java API to automate the Chrome browser directly, designed for common needs such as converting HTML to PDF or taking a screenshot of a page. Here is an [example](../karate-demo/src/test/java/driver/screenshot/ChromePdfRunner.java):
+Karate also has a Java API to automate the Chrome browser directly, designed for common needs such as converting HTML to PDF or taking a screenshot of a page. You only need the [`karate-core`](https://search.maven.org/search?q=a:karate-core) Maven artifact. Here is an [example](../karate-demo/src/test/java/driver/screenshot/ChromePdfRunner.java):
 
 ```java
 import com.intuit.karate.FileUtils;
@@ -53,7 +53,10 @@ public class Test {
 The parameters that you can optionally customize via the `Map` argument to the `pdf()` method are documented here: [`Page.printToPDF
 `](https://chromedevtools.github.io/devtools-protocol/tot/Page/#method-printToPDF).
 
-If Chrome is not installed in the default location, you can pass a String argument like this: `Chrome.startHeadless(executable)` or `Chrome.start(executable)`.
+If Chrome is not installed in the default location, you can pass a String argument like this: `Chrome.startHeadless(executable)` or `Chrome.start(executable)`. For more control or custom options, the `start()` method takes a `Map<String, Object>` argument where the following keys (all optional) are supported:
+* `executable` - (String) path to the Chrome executable or batch file that starts Chrome
+* `headless` - (Boolean) if headless
+* `maxPayloadSize` - (Integer) defaults to 4194304 (bytes, around 4 MB), but you can override it if you deal with very large output / binary payloads
 
 # Syntax Guide
 
@@ -118,6 +121,8 @@ type | default<br/>port | default<br/>executable | description
 [`mswebdriver`](https://docs.microsoft.com/en-us/microsoft-edge/webdriver) | 17556 | `MicrosoftWebDriver` | W3C Microsoft Edge WebDriver
 [`msedge`](https://docs.microsoft.com/en-us/microsoft-edge/devtools-protocol/) | 9222 | `MicrosoftEdge` | *very* experimental - using the DevTools protocol
 [`winappdriver`](https://github.com/Microsoft/WinAppDriver) | 4727 | `C:/Program Files (x86)/Windows Application Driver/WinAppDriver` | Windows Desktop automation, similar to Appium
+[`android`](https://github.com/appium/appium/) | 4723 | `appium` | android automation via [Appium](https://github.com/appium/appium/)
+[`ios`](https://github.com/appium/appium/) | 4723 |`appium` | iOS automation via [Appium](https://github.com/appium/appium/)
 
 ## Locators
 The standard locator syntax is supported. For example for web-automation, a `/` prefix means XPath and else it would be evaluated as a "CSS selector".
@@ -127,15 +132,18 @@ And driver.input('input[name=someName]', 'test input')
 When driver.submit("//input[@name='commit']")
 ```
 
-web ? | prefix | means | example
+platform | prefix | means | example
 ----- | ------ | ----- | -------
 web | (none) | css selector | `input[name=someName]`
-web | `/` | xpath | `//input[@name='commit']`
+web <br/> android <br/> ios | `/` | xpath | `//input[@name='commit']`
 web | `^` | link text | `^Click Me`
 web | `*` | partial link text | `*Click Me`
-win | (none) | name | `Submit`
-win | `@` | accessibility id | `@CalculatorResults`
-win | `#` | id | `#MyButton`
+win <br/> android <br/> ios| (none) | name | `Submit`
+win <br/> android <br/> ios | `@` | accessibility id | `@CalculatorResults`
+win <br/> android <br/> ios | `#` | id | `#MyButton`
+ios| `:` | -ios predicate string | `:name == 'OK' type == XCUIElementTypeButton`
+ios| `^` | -ios class chain | ``^**/XCUIElementTypeTable[`name == 'dataTable'`]``
+android| `-` | -android uiautomator | `-input[name=someName]`
 
 ## Keywords
 Only one keyword sets up UI automation in Karate, typically by specifying the URL to open in a browser. And then you would use the built-in [`driver`](#js-api) JS object for all other operations, combined with Karate's [`match`](https://github.com/intuit/karate#prepare-mutate-assert) syntax for assertions where needed.

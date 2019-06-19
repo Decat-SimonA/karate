@@ -35,12 +35,7 @@ import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
-import java.net.URI;
-import java.util.function.Consumer;
-import javax.net.ssl.SSLException;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,80 +47,64 @@ public class WebSocketClient implements WebSocketListener {
 
     private static final Logger logger = LoggerFactory.getLogger(WebSocketClient.class);
 
-    private final URI uri;
-    private final int port;
-    private final boolean ssl;
     private final Channel channel;
     private final EventLoopGroup group;
-    
-    private Consumer<String> textHandler;
-    private Consumer<byte[]> binaryHandler;
-    
+
+    private Function<String, Boolean> textHandler;
+    private Function<byte[], Boolean> binaryHandler;
+
     @Override
     public void onMessage(String text) {
         if (textHandler != null) {
-            textHandler.accept(text);
+            if (textHandler.apply(text)) {
+                signal(text);
+            }
         }
     }
 
     @Override
     public void onMessage(byte[] bytes) {
         if (binaryHandler != null) {
-            binaryHandler.accept(bytes);
+            if (binaryHandler.apply(bytes)) {
+                signal(bytes);
+            }
         }
-    }    
-    
-    private boolean waiting;
-    
-    public WebSocketClient(String url, String subProtocol, Consumer<String> textHandler) {
-        this(url, subProtocol, textHandler, null);
     }
 
-    public WebSocketClient(String url, String subProtocol, Consumer<String> textHandler, Consumer<byte[]> binaryHandler) {
-        this.textHandler = textHandler;
-        this.binaryHandler = binaryHandler;
-        uri = URI.create(url);
-        ssl = "wss".equalsIgnoreCase(uri.getScheme());
-        SslContext sslContext;
-        if (ssl) {
-            try {
-                sslContext = SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
-            } catch (SSLException e) {
-                throw new RuntimeException(e);
-            }
-        } else {
-            sslContext = null;
-        }
-        port = uri.getPort() == -1 ? (ssl ? 443 : 80) : uri.getPort();
+    public WebSocketClient(WebSocketOptions options) {
+        this.textHandler = options.getTextHandler();
+        this.binaryHandler = options.getBinaryHandler();
         group = new NioEventLoopGroup();
         try {
-            WebSocketClientInitializer initializer = new WebSocketClientInitializer(uri, port, subProtocol, sslContext, this);
+            WebSocketClientInitializer initializer = new WebSocketClientInitializer(options, this);
             Bootstrap b = new Bootstrap();
             b.group(group)
                     .channel(NioSocketChannel.class)
                     .handler(initializer);
-            channel = b.connect(uri.getHost(), port).sync().channel();
+            channel = b.connect(options.getUri().getHost(), options.getPort()).sync().channel();
             initializer.getHandler().handshakeFuture().sync();
         } catch (Exception e) {
             logger.error("websocket server init failed: {}", e.getMessage());
-            throw new RuntimeException(e);            
+            throw new RuntimeException(e);
         }
     }
 
-    public void setBinaryHandler(Consumer<byte[]> binaryHandler) {
+    public void setBinaryHandler(Function<byte[], Boolean> binaryHandler) {
         this.binaryHandler = binaryHandler;
     }
 
-    public void setTextHandler(Consumer<String> textHandler) {
+    public void setTextHandler(Function<String, Boolean> textHandler) {
         this.textHandler = textHandler;
-    }        
+    }       
+    
+    private boolean waiting;
 
     public void waitSync() {
         if (waiting) {
             return;
         }
         try {
-            waiting = true;            
+            waiting = true;
             channel.closeFuture().sync();
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -143,18 +122,50 @@ public class WebSocketClient implements WebSocketListener {
         channel.writeAndFlush(frame);
     }
 
-    public void send(String msg) {        
+    public void send(String msg) {
         WebSocketFrame frame = new TextWebSocketFrame(msg);
         channel.writeAndFlush(frame);
         if (logger.isTraceEnabled()) {
             logger.trace("sent: {}", msg);
         }
     }
-    
+
     public void sendBytes(byte[] msg) {
         ByteBuf byteBuf = Unpooled.copiedBuffer(msg);
         BinaryWebSocketFrame frame = new BinaryWebSocketFrame(byteBuf);
         channel.writeAndFlush(frame);
+    }
+
+    private final Object LOCK = new Object();
+    private Object signalResult;
+
+    public void signal(Object result) {
+        logger.trace("signal called: {}", result);
+        synchronized (LOCK) {
+            signalResult = result;
+            LOCK.notify();
+        }
+    }
+
+    public Object listen(long timeout) {
+        synchronized (LOCK) {
+            if (signalResult != null) {
+                logger.debug("signal arrived early ! result: {}", signalResult);
+                Object temp = signalResult;
+                signalResult = null;
+                return temp;
+            }
+            try {
+                logger.trace("entered listen wait state");
+                LOCK.wait(timeout);
+                logger.trace("exit listen wait state, result: {}", signalResult);
+            } catch (InterruptedException e) {
+                logger.error("listen timed out: {}", e.getMessage());
+            }
+            Object temp = signalResult;
+            signalResult = null;
+            return temp;
+        }
     }
 
 }

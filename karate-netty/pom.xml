@@ -5,12 +5,17 @@
     <parent>
         <groupId>com.intuit.karate</groupId>
         <artifactId>karate-parent</artifactId>
-        <version>0.9.2</version>
+        <version>0.9.3</version>
     </parent>
     <artifactId>karate-netty</artifactId>
     <packaging>jar</packaging>
 
-    <dependencies>                         
+    <dependencies>
+        <dependency>
+            <groupId>com.intuit.karate</groupId>
+            <artifactId>karate-ui</artifactId>
+            <version>${project.version}</version>
+        </dependency>                             
         <dependency>
             <groupId>com.intuit.karate</groupId>
             <artifactId>karate-apache</artifactId>
@@ -20,13 +25,13 @@
             <groupId>net.masterthought</groupId>
             <artifactId>cucumber-reporting</artifactId>
             <version>${cucumber.reporting.version}</version>
-        </dependency>                                             
+        </dependency>
         <dependency>
-            <groupId>com.intuit.karate</groupId>
-            <artifactId>karate-junit4</artifactId>
-            <version>${project.version}</version>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
             <scope>test</scope>
-        </dependency>                                                                                                                                                                                         		
+        </dependency>                                                                                                                                                                                               		
     </dependencies>
     
     <build>
@@ -37,7 +42,17 @@
                     <exclude>**/*.java</exclude>
                 </excludes>
             </testResource>
-        </testResources>            
+        </testResources>
+        <plugins>
+            <plugin>
+                <groupId>org.sonatype.plugins</groupId>
+                <artifactId>nexus-staging-maven-plugin</artifactId>
+                <version>${nexus.staging.plugin.version}</version>
+                <configuration>
+                    <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
+                </configuration>
+            </plugin>            
+        </plugins>           
     </build> 
     
     <profiles>
@@ -64,7 +79,7 @@
                                     </artifactSet>
                                     <transformers>
                                         <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                            <mainClass>com.intuit.karate.netty.Main</mainClass>
+                                            <mainClass>com.intuit.karate.Main</mainClass>
                                         </transformer>
                                     </transformers>
                                 </configuration>
